@@ -24,6 +24,7 @@ class ActivityLog(models.Model):
     actor = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     action_type = models.CharField(choices=ACTION_TYPES, max_length=15)
     action_time = models.DateTimeField(auto_now_add=True, editable=False)
+    execution_time = models.CharField(max_length=155, verbose_name="Execution time (s)", null=True, blank=True)
     remarks = models.TextField(blank=True, null=True)
     status = models.CharField(choices=ACTION_STATUS, max_length=7, default=SUCCESS)
     status_code = models.PositiveIntegerField(null=True, blank=True)
