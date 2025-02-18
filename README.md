@@ -1,56 +1,59 @@
+# 🎯 django-trackmate
 
-# django-trackmate
-
-**django-trackmate** is a lightweight and customizable Django package for tracking API requests, login/logout activities, and user-defined actions within your application. This package is designed to simplify activity tracking and help you gain actionable insights into user behavior.
+**django-trackmate** is a lightweight and customizable Django package for tracking API requests, login/logout activities, and user-defined actions within your application. This package simplifies activity tracking and provides actionable insights into user behavior.
 
 ---
 
 ## 🚀 Features
 
-- **Request Logging**: Automatically log incoming API requests with detailed metadata.
-- **Login/Logout Tracking**: Monitor user authentication events seamlessly.
-- **Custom Action Logs**: Track user actions across your application.
-- **Django Admin Integration**: View, filter, and manage activity logs in the admin panel.
-- **GenericForeignKey Support**: Log actions related to various models effortlessly.
-- **Highly Configurable**: Exclude paths, customize log details, and more.
+✔ **Request Logging** – Automatically log incoming API requests with detailed metadata.  
+✔ **Login/Logout Tracking** – Monitor user authentication events seamlessly.  
+✔ **Custom Action Logs** – Track user actions across your application.  
+✔ **Django Admin Integration** – View, filter, and manage activity logs in the admin panel.  
+✔ **GenericForeignKey Support** – Log actions related to various models effortlessly.  
+✔ **Highly Configurable** – Exclude paths, customize log details, and more.  
 
 ---
 
 ## 📦 Installation
 
-1. Using pip:
+### 1️⃣ Install the package
+Using pip:
 
-   ```bash
-   pip install django-trackmate
-   ```
-   
-   or using uv:
+```bash
+pip install django-trackmate
 
-   ```bash
-   uv add django-trackmate
-   ```
 
-2. Add `trackmate` to your `INSTALLED_APPS` in `settings.py`:
+or using `uv`:
 
-   ```python
-   INSTALLED_APPS = [
-       ...
-       'django_trackmate',
-   ]
-   ```
+```bash
+uv add django-trackmate
+```
 
-3. Run migrations to set up the necessary database tables:
+### 2️⃣ Add to `INSTALLED_APPS`
+Modify your `settings.py`:
 
-   ```bash
-   python manage.py makemigrations django_trackmate
-   python manage.py migrate
-   ```
+```python
+INSTALLED_APPS = [
+    ...
+    'django_trackmate',
+]
+```
+
+### 3️⃣ Run Migrations
+Set up the necessary database tables:
+
+```bash
+python manage.py makemigrations django_trackmate
+python manage.py migrate
+```
 
 ---
 
 ## 🛠 Usage
 
-### Logging Custom Actions
+### 📝 Logging Custom Actions
+
 Use the `tracker` decorator to log custom actions:
 
 ```python
@@ -61,44 +64,104 @@ def my_api_view(request):
     ...
 ```
 
-### Extending Functionality
-Directly create activity logs using the `ActivityLog` model:
+### 🛡️ Enable Middleware
+
+Add `RequestTrackerMiddleware` to `MIDDLEWARE`:
+
+```python
+MIDDLEWARE = [
+    ...
+    'django_trackmate.middleware.RequestTrackerMiddleware',
+]
+```
+
+---
+
+## ⚙️ Configuration
+
+Customize logging behavior in `settings.py`:
+
+```python
+TRACKMATE_EXCLUDED_PATH = ["/admin/", "/docs/"]  # Paths to exclude from logging
+TRACKMATE_LOG_LOGIN_ACTIVITIES = True  # Enable login activity logging (default: True)
+```
+
+---
+
+## 📂 Extending Functionality
+
+You can manually create activity logs using the `ActivityLog` model:
 
 ```python
 from django_trackmate.models import ActivityLog
+from datetime import datetime
 
-    ActivityLog.objects.create(
-        actor=None,
-        action_type=LOGIN_FAILED,
-        action_time=datetime.now(),
-        remarks=message
-    )
+ActivityLog.objects.create(
+    actor=None,
+    action_type="LOGIN_FAILED",
+    action_time=datetime.now(),
+    remarks="Invalid credentials"
+)
 ```
 
-### Parameters
-- `content_object`: An instance of a Django model to link to the activity log.
-- `actor`: The user who performed the action.
-- `action_type`: The type of action being logged. Choices: "Create", "Read", "Update", "Delete", "Login", "Logout", "Login Failed".
-- `action_time`: The timestamp of the action.
-- `remarks`: Additional details about the action.
-- `ip_address`: The IP address of the user's request.
-- `status`: The status of the action. Choices: "Success", "Failed".
-- `status_code`: The HTTP status code associated with the action.
-- `response`: The response data associated with the action.
-- `data`: The request data associated with the action.
+### 🔍 Available Parameters
+
+| Parameter       | Description |
+|----------------|-------------|
+| `content_object` | Django model instance linked to the log |
+| `actor` | User performing the action |
+| `action_type` | Action type (`Create`, `Read`, `Update`, `Delete`, `Login`, `Logout`, `Login Failed`) |
+| `action_time` | Timestamp of the action |
+| `remarks` | Additional details |
+| `ip_address` | IP address of the request |
+| `status` | Status (`Success`, `Failed`) |
+| `status_code` | HTTP status code |
+| `response` | Response data |
+| `data` | Request data |
 
 ---
 
 ## 📊 Viewing Logs
 
-- View logs in the Django Admin under the **Activity Logs** section.
-- Use filters to sort by user, action type, timestamp, or related object.
+- View logs in **Django Admin** under the **Activity Logs** section.
+- Use filters to sort by user, action type, timestamp, or related objects.
+
+### 🎨 Enhancing UI with `django-unfold`
+
+1️⃣ Install `django-unfold`:
+
+```bash
+pip install django-unfold
+```
+
+2️⃣ Add `unfold` to `INSTALLED_APPS`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'unfold',
+]
+```
+
+3️⃣ Customize the admin panel (`admin.py`):
+
+```python
+from django.contrib import admin
+from django_trackmate.models import ActivityLog
+from unfold.admin import ModelAdmin
+from unfold.contrib.filters.admin import RangeDateFilter
+
+@admin.register(ActivityLog)
+class ActivityLogAdmin(ModelAdmin):
+    list_display = ('id', 'actor', 'action_type', 'action_time', 'status_code', 'status', 'remarks')
+    list_filter = ("action_type", "status_code", ("action_time", RangeDateFilter))  # Date filter
+```
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Running Tests (Coming Soon) 🚧
 
-Run the test suite to ensure everything is functioning correctly:
+Run tests to ensure everything is working:
 
 ```bash
 python manage.py test trackmate
@@ -110,25 +173,28 @@ python manage.py test trackmate
 
 Contributions are welcome! To contribute:
 
-1. Fork the repository.
-2. Create a new branch for your feature or bugfix.
-3. Submit a pull request with a detailed description of the changes.
+1️⃣ Fork the repository.  
+2️⃣ Create a new branch for your feature or bugfix.  
+3️⃣ Submit a pull request with a detailed description.  
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 📧 Support
 
-If you encounter any issues or have questions, feel free to open an issue on GitHub or email us at **aime.degbey@kodesio.com**.
+If you encounter issues or have questions, feel free to:  
+📬 Open an issue on **GitHub**  
+📩 Email us at **aime.degbey@kodesio.com**
 
 ---
 
 ## 🏗 Built With
 
-- **Django**: The web framework for perfectionists with deadlines.
-- **Python**: Simplicity and flexibility for building scalable software.
+- **Django** – The web framework for perfectionists with deadlines.  
+- **Python** – Simplicity and flexibility for scalable software.  
+```
