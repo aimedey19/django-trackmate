@@ -1,6 +1,7 @@
 import time
 from datetime import datetime
 from functools import wraps
+import json
 
 from .utils import get_client_ip, get_request_data
 
@@ -23,7 +24,7 @@ def _get_action_type(request) -> str:
 
 
 def _build_log_message(request) -> str:
-    return f"User: {request.user} -- Action Type: {_get_action_type(request)} -- Path: {request.path} -- Path Name: {request.resolver_match.url_name} -- IP: {get_client_ip(request)}"
+    return f"User: {request.user} -- Action Type: {_get_action_type(request)} -- Path: {request.path} -- Path Name:  -- IP: {get_client_ip(request)}"
 
 
 def get_log_message(request, log_message: str = None) -> str:
@@ -60,8 +61,8 @@ def inner_tracker(request, response, **kwargs):
         "remarks": get_log_message(request),
         "status": SUCCESS if response.status_code < 400 else FAILED,
         "status_code": response.status_code,
-        "response": response.data if hasattr(response, "data") else {},
-        "data": get_request_data(request),
+        "response": json.dumps(response.data) if hasattr(response, "data") else {},
+        "data": json.dumps(get_request_data(request)),
         **kwargs
     }
     ActivityLog.objects.create(**data)
