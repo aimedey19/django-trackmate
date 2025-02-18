@@ -4,3 +4,7 @@ _default:
 build:
     #!/bin/bash
     python -m build
+
+deploy:
+    #!/bin/bash
+    twine upload dist/*
