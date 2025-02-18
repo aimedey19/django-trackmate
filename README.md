@@ -140,6 +140,7 @@ pip install django-unfold
 INSTALLED_APPS = [
     ...
     'unfold',
+    'unfold.contrib.filters',
 ]
 ```
 
