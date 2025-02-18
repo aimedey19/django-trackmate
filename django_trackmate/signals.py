@@ -5,6 +5,7 @@ from django.contrib.auth.signals import user_logged_in, user_login_failed, user_
 from django.dispatch import receiver
 
 from .models import ActivityLog, LOGIN, LOGIN_FAILED, LOGOUT
+from .utils import get_client_ip
 
 # Get TRACKMATE settings
 TRACKMATE_LOG_LOGIN_ACTIVITIES = getattr(
