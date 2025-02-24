@@ -22,7 +22,7 @@ Using pip:
 
 ```bash
 pip install django-trackmate
-
+```
 
 or using `uv`:
 
@@ -198,4 +198,3 @@ If you encounter issues or have questions, feel free to:
 
 - **Django** – The web framework for perfectionists with deadlines.  
 - **Python** – Simplicity and flexibility for scalable software.  
-```
