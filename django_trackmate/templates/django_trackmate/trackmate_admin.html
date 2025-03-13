@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | Django Trackmate</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap"
+          rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans', sans-serif;
+        }
+
+        .sidebar {
+            min-height: 100vh;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .sidebar .nav-link {
+            color: #333;
+            border-radius: 0;
+            padding: 0.75rem 1.25rem;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: #f8f9fa;
+        }
+
+        .sidebar .nav-link.active {
+            background-color: #000000;
+            color: white;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 0.5rem;
+        }
+
+        .log-entry {
+            transition: all 0.2s;
+        }
+
+        .log-entry:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+
+        .log-type-create {
+            border-left: 4px solid #6c757d;
+        }
+
+        .log-type-update {
+            border-left: 4px solid #6c757d;
+        }
+
+        .log-type-delete {
+            border-left: 4px solid #6c757d;
+        }
+
+        .log-type-login {
+            border-left: 4px solid #6c757d;
+        }
+
+        .log-type-other {
+            border-left: 4px solid #6c757d;
+        }
+
+        .log-timestamp {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .log-actor {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .log-remarks {
+            font-family: monospace;
+        }
+
+        .log-details {
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .chart-container {
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+<div x-data="{
+        sidebarOpen: true,
+        activeTab: 'dashboard',
+        logs: [],
+        filteredLogs: [],
+        searchQuery: '',
+        selectedActionTypes: ['create', 'update', 'delete', 'login', 'other'],
+        dateRange: {
+            start: '',
+            end: ''
+        },
+        selectedLog: null,
+        logStats: {
+            create: 0,
+            update: 0,
+            delete: 0,
+            login: 0,
+            other: 0
+        },
+        loading: true,
+
+        init() {
+            this.fetchLogs();
+
+            // Watch for filter changes
+            this.$watch('searchQuery', () => this.filterLogs());
+            this.$watch('selectedActionTypes', () => this.filterLogs());
+            this.$watch('dateRange', () => this.filterLogs(), { deep: true });
+        },
+
+        fetchLogs() {
+            this.loading = true;
+            fetch('/django_trackmate/fetch-logs/')
+                .then(response => response.json())
+                .then(data => {
+                    this.logs = JSON.parse(data.logs_json);
+                    this.filterLogs();
+                    this.calculateStats();
+                    this.loading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching logs:', error);
+                    this.loading = false;
+                });
+        },
+
+        filterLogs() {
+            this.filteredLogs = this.logs.filter(log => {
+                // Normalize action_type for filtering
+                const actionType = this.normalizeActionType(log.action_type);
+
+                // Filter by action type
+                if (!this.selectedActionTypes.includes(actionType)) {
+                    return false;
+                }
+
+                // Filter by search query
+                if (this.searchQuery &&
+                    !log.remarks?.toLowerCase().includes(this.searchQuery.toLowerCase()) &&
+                    !log.actor?.toLowerCase().includes(this.searchQuery.toLowerCase()) &&
+                    !log.action_type?.toLowerCase().includes(this.searchQuery.toLowerCase())) {
+                    return false;
+                }
+
+                // Filter by date range
+                if (this.dateRange.start && new Date(log.timestamp) < new Date(this.dateRange.start)) {
+                    return false;
+                }
+                if (this.dateRange.end && new Date(log.timestamp) > new Date(this.dateRange.end)) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            this.calculateStats();
+        },
+
+        normalizeActionType(actionType) {
+            if (!actionType) return 'other';
+
+            actionType = actionType.toLowerCase();
+            if (actionType.includes('create') || actionType.includes('add') || actionType.includes('new')) {
+                return 'create';
+            } else if (actionType.includes('update') || actionType.includes('edit') || actionType.includes('modify')) {
+                return 'update';
+            } else if (actionType.includes('delete') || actionType.includes('remove')) {
+                return 'delete';
+            } else if (actionType.includes('login') || actionType.includes('auth') || actionType.includes('signin')) {
+                return 'login';
+            } else {
+                return 'other';
+            }
+        },
+
+        getActionTypeBadgeClass(actionType) {
+            const normalizedType = this.normalizeActionType(actionType);
+
+            return {
+                'bg-success': normalizedType === 'create',
+                'bg-primary': normalizedType === 'update',
+                'bg-danger': normalizedType === 'delete',
+                'bg-purple': normalizedType === 'login',
+                'bg-secondary': normalizedType === 'other'
+            };
+        },
+
+        getLogEntryClass(actionType) {
+            const normalizedType = this.normalizeActionType(actionType);
+
+            return {
+                'log-type-create': normalizedType === 'create',
+                'log-type-update': normalizedType === 'update',
+                'log-type-delete': normalizedType === 'delete',
+                'log-type-login': normalizedType === 'login',
+                'log-type-other': normalizedType === 'other'
+            };
+        },
+
+        calculateStats() {
+            this.logStats = {
+                create: this.filteredLogs.filter(log => this.normalizeActionType(log.action_type) === 'create').length,
+                update: this.filteredLogs.filter(log => this.normalizeActionType(log.action_type) === 'update').length,
+                delete: this.filteredLogs.filter(log => this.normalizeActionType(log.action_type) === 'delete').length,
+                login: this.filteredLogs.filter(log => this.normalizeActionType(log.action_type) === 'login').length,
+                other: this.filteredLogs.filter(log => this.normalizeActionType(log.action_type) === 'other').length
+            };
+        },
+
+        formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        },
+
+        viewLogDetails(log) {
+            this.selectedLog = log;
+        },
+
+        closeLogDetails() {
+            this.selectedLog = null;
+        },
+
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
+        },
+
+        formatJSON(jsonString) {
+            try {
+                if (!jsonString) return '';
+                if (typeof jsonString === 'object') return JSON.stringify(jsonString, null, 2);
+                return JSON.stringify(JSON.parse(jsonString), null, 2);
+            } catch (e) {
+                return jsonString;
+            }
+        }
+    }">
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block sidebar bg-light collapse" :class="{ 'd-none': !sidebarOpen }">
+                <div class="position-sticky pt-3">
+                    <div class="d-flex justify-content-between align-items-center px-3 mb-3">
+                        <h5 class="m-0">Django Trackmate</h5>
+                        <button @click="toggleSidebar" class="btn btn-sm btn-link d-md-none">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a @click.prevent="activeTab = 'dashboard'" class="nav-link"
+                               :class="{ 'active': activeTab === 'dashboard' }" href="#">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a @click.prevent="activeTab = 'logs'" class="nav-link"
+                               :class="{ 'active': activeTab === 'logs' }" href="#">
+                                <i class="bi bi-journal-text"></i> Logs
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a @click.prevent="activeTab = 'settings'" class="nav-link"
+                               :class="{ 'active': activeTab === 'settings' }" href="#">
+                                <i class="bi bi-gear"></i> Settings
+                            </a>
+                        </li>
+                    </ul>
+
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>Action Types</span>
+                    </h6>
+                    <div class="px-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="createCheck" value="create"
+                                   x-model="selectedActionTypes">
+                            <label class="form-check-label" for="createCheck">
+                                <span class="badge bg-secondary">Create</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="updateCheck" value="update"
+                                   x-model="selectedActionTypes">
+                            <label class="form-check-label" for="updateCheck">
+                                <span class="badge bg-secondary">Update</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="deleteCheck" value="delete"
+                                   x-model="selectedActionTypes">
+                            <label class="form-check-label" for="deleteCheck">
+                                <span class="badge bg-secondary">Delete</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="loginCheck" value="login"
+                                   x-model="selectedActionTypes">
+                            <label class="form-check-label" for="loginCheck">
+                                <span class="badge bg-secondary">Login</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="otherCheck" value="other"
+                                   x-model="selectedActionTypes">
+                            <label class="form-check-label" for="otherCheck">
+                                <span class="badge bg-secondary">Other</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>Date Range</span>
+                    </h6>
+                    <div class="px-3">
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="datetime-local" class="form-control form-control-sm" id="startDate"
+                                   x-model="dateRange.start">
+                        </div>
+                        <div class="mb-3">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="datetime-local" class="form-control form-control-sm" id="endDate"
+                                   x-model="dateRange.end">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">
+                        <button @click="toggleSidebar" class="btn btn-sm btn-outline-secondary d-md-none me-2">
+                            <i class="bi bi-list"></i>
+                        </button>
+                        <span x-text="activeTab === 'dashboard' ? 'Dashboard' : (activeTab === 'logs' ? 'Activity Logs' : 'Settings')"></span>
+                    </h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="input-group">
+                            <input type="text" class="form-control" placeholder="Search logs..." x-model="searchQuery">
+                            <button class="btn btn-outline-secondary" type="button">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Tab -->
+                <div x-show="activeTab === 'dashboard'">
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h5 class="card-title">Create Actions</h5>
+                                    <h2 class="card-text" x-text="logStats.create"></h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h5 class="card-title">Update Actions</h5>
+                                    <h2 class="card-text" x-text="logStats.update"></h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h5 class="card-title">Delete Actions</h5>
+                                    <h2 class="card-text" x-text="logStats.delete"></h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h5 class="card-title">Other Actions</h5>
+                                    <h2 class="card-text" x-text="logStats.login + logStats.other"></h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    Activity Over Time
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <!-- In a real app, you would use a charting library like Chart.js -->
+                                        <div class="alert alert-info">
+                                            This is a placeholder for a chart. In a real Django app, you would use a
+                                            charting library like Chart.js to visualize activity data over time.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    Recent Activity
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="list-group list-group-flush">
+                                        <template x-for="log in filteredLogs.slice(0, 5)" :key="log.id">
+                                            <a href="#" @click.prevent="viewLogDetails(log)"
+                                               class="list-group-item list-group-item-action">
+                                                <div class="d-flex w-100 justify-content-between">
+                                                    <h6 class="mb-1">
+                                                        <span class="badge"
+                                                              :class="getActionTypeBadgeClass(log.action_type)"
+                                                              x-text="log.action_type"></span>
+                                                        <span class="ms-2" x-text="log.actor"></span>
+                                                    </h6>
+                                                    <small x-text="formatDate(log.timestamp)"></small>
+                                                </div>
+                                                <p class="mb-1" x-text="log.remarks"></p>
+                                            </a>
+                                        </template>
+                                        <div x-show="filteredLogs.length === 0" class="list-group-item">
+                                            No activity logs found.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    Activity by User
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <!-- In a real app, you would use a charting library like Chart.js -->
+                                        <div class="alert alert-info">
+                                            This is a placeholder for a pie chart showing activity distribution by user.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div x-show="activeTab === 'logs'">
+                    <div class="card">
+                        <div class="card-header">
+                            Activity Log Entries
+                            <span class="badge bg-secondary ms-2" x-text="filteredLogs.length + ' entries'"></span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div x-show="loading" class="text-center p-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading activity logs...</p>
+                            </div>
+                            <div x-show="!loading && filteredLogs.length === 0" class="text-center p-4">
+                                <p class="text-muted">No activity logs found matching your criteria.</p>
+                            </div>
+                            <div x-show="!loading && filteredLogs.length > 0" class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Action Type</th>
+                                        <th>Actor</th>
+                                        <th>Remarks</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <template x-for="log in filteredLogs" :key="log.id">
+                                        <tr class="log-entry" :class="getLogEntryClass(log.action_type)">
+                                            <td class="log-timestamp" x-text="formatDate(log.timestamp)"></td>
+                                            <td>
+                                                <span class="badge" :class="getActionTypeBadgeClass(log.action_type)"
+                                                      x-text="log.action_type"></span>
+                                            </td>
+                                            <td class="log-actor" x-text="log.actor"></td>
+                                            <td class="log-remarks" x-text="log.remarks"></td>
+                                            <td>
+                                                <button @click="viewLogDetails(log)"
+                                                        class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div x-show="activeTab === 'settings'">
+                    <div class="card">
+                        <div class="card-header">
+                            Log Settings
+                        </div>
+                        <div class="card-body">
+                            <form>
+                                <div class="mb-3">
+                                    <label for="logRetention" class="form-label">Log Retention Period (days)</label>
+                                    <input type="number" class="form-control" id="logRetention" value="30">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="logLevel" class="form-label">Minimum Log Level</label>
+                                    <select class="form-select" id="logLevel">
+                                        <option value="all">All Actions</option>
+                                        <option value="create">Create and above</option>
+                                        <option value="update">Update and above</option>
+                                        <option value="delete">Delete only</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" id="emailNotifications" checked>
+                                    <label class="form-check-label" for="emailNotifications">Email notifications for
+                                        delete actions</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="emailRecipients" class="form-label">Email Recipients</label>
+                                    <input type="text" class="form-control" id="emailRecipients"
+                                           value="admin@example.com">
+                                    <div class="form-text">Separate multiple emails with commas</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Log Details Modal -->
+    <div class="modal fade" :class="{ 'show d-block': selectedLog !== null }" tabindex="-1" role="dialog"
+         aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Activity Log Details</h5>
+                    <button type="button" class="btn-close" @click="closeLogDetails" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" x-show="selectedLog">
+                    <div class="mb-3">
+                        <h6>Timestamp</h6>
+                        <p x-text="selectedLog ? formatDate(selectedLog.timestamp) : ''"></p>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Action Type</h6>
+                        <span class="badge" :class="selectedLog ? getActionTypeBadgeClass(selectedLog.action_type) : ''"
+                              x-text="selectedLog ? selectedLog.action_type : ''"></span>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Actor</h6>
+                        <p x-text="selectedLog ? selectedLog.actor : ''"></p>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Remarks</h6>
+                        <p x-text="selectedLog ? selectedLog.remarks : ''"></p>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Response</h6>
+                        <pre class="log-details p-3" x-text="selectedLog ? formatJSON(selectedLog.response) : ''"></pre>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Data</h6>
+                        <pre class="log-details p-3" x-text="selectedLog ? formatJSON(selectedLog.data) : ''"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @click="closeLogDetails">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show" x-show="selectedLog !== null"></div>
+</div>
+
+<!-- Bootstrap Bundle with Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+</body>
+</html>
